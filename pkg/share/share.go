@@ -33,4 +33,7 @@ var (
 
 	// BrokerClusterName is the broker cluster name
 	BrokerClusterName = ""
+
+	// svc of controller for brokers
+	ControllerAccessPoint = ""
 )

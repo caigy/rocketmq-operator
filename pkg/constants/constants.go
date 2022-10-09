@@ -154,4 +154,7 @@ const (
 	EnvControllerStorePath   = "controllerStorePath"
 
 	EnvControllerDLegerGroup = "controllerDLegerGroup"
+
+	EnvEnableControllerMode = "enableControllerMode"
+	EnvControllerAddr       = "controllerAddr"
 )

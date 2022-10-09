@@ -20,11 +20,12 @@ package broker
 
 import (
 	"context"
-	"github.com/google/uuid"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 
 	rocketmqv1alpha1 "github.com/apache/rocketmq-operator/pkg/apis/rocketmq/v1alpha1"
 	cons "github.com/apache/rocketmq-operator/pkg/constants"
@@ -48,7 +49,6 @@ import (
 )
 
 var log = logf.Log.WithName("controller_broker")
-var isInitial = true
 var cmd = []string{"/bin/bash", "-c", "echo Initial broker"}
 
 /**
@@ -156,6 +156,15 @@ func (r *ReconcileBroker) Reconcile(ctx context.Context, request reconcile.Reque
 		share.NameServersStr = broker.Spec.NameServers
 	}
 
+	if broker.Spec.ClusterMode == "" {
+		broker.Spec.ClusterMode = "STATIC"
+	}
+
+	if broker.Spec.ClusterMode == "CONTROLLER" && share.ControllerAccessPoint == "" {
+		log.Info("Broker Waiting for Controller ready...")
+		return reconcile.Result{Requeue: true, RequeueAfter: time.Duration(cons.RequeueIntervalInSecond) * time.Second}, nil
+	}
+
 	share.BrokerClusterName = broker.Name
 	replicaPerGroup := broker.Spec.ReplicaPerGroup
 	reqLogger.Info("brokerGroupNum=" + strconv.Itoa(share.GroupNum) + ", replicaPerGroup=" + strconv.Itoa(replicaPerGroup))
@@ -175,7 +184,7 @@ func (r *ReconcileBroker) Reconcile(ctx context.Context, request reconcile.Reque
 			reqLogger.Error(err, "Failed to get broker master StatefulSet.")
 		}
 
-		for replicaIndex := 1; replicaIndex <= replicaPerGroup; replicaIndex++ {
+		for replicaIndex := 1; broker.Spec.ClusterMode == "STATIC" && replicaIndex <= replicaPerGroup; replicaIndex++ {
 			reqLogger.Info("Check Replica Broker of cluster-" + strconv.Itoa(brokerGroupIndex) + " " + strconv.Itoa(replicaIndex) + "/" + strconv.Itoa(replicaPerGroup))
 			replicaDep := r.getBrokerStatefulSet(broker, brokerGroupIndex, replicaIndex)
 			err = r.client.Get(context.TODO(), types.NamespacedName{Name: replicaDep.Name, Namespace: replicaDep.Namespace}, found)
@@ -395,10 +404,14 @@ func (r *ReconcileBroker) getBrokerStatefulSet(broker *rocketmqv1alpha1.Broker, 
 	var a int32 = 1
 	var c = &a
 	var statefulSetName string
-	if replicaIndex == 0 {
-		statefulSetName = broker.Name + "-" + strconv.Itoa(brokerGroupIndex) + "-master"
-	} else {
-		statefulSetName = broker.Name + "-" + strconv.Itoa(brokerGroupIndex) + "-replica-" + strconv.Itoa(replicaIndex)
+	if broker.Spec.ClusterMode == "STATIC" {
+		if replicaIndex == 0 {
+			statefulSetName = broker.Name + "-" + strconv.Itoa(brokerGroupIndex) + "-master"
+		} else {
+			statefulSetName = broker.Name + "-" + strconv.Itoa(brokerGroupIndex) + "-replica-" + strconv.Itoa(replicaIndex)
+		}
+	} else if broker.Spec.ClusterMode == "CONTROLLER" {
+		statefulSetName = broker.Name + "-" + strconv.Itoa(brokerGroupIndex) + "-" + strconv.Itoa(replicaIndex)
 	}
 
 	// After CustomResourceDefinition version upgraded from v1beta1 to v1
@@ -499,6 +512,10 @@ func getENV(broker *rocketmqv1alpha1.Broker, replicaIndex int, brokerGroupIndex 
 		Name:  cons.EnvBrokerName,
 		Value: broker.Name + "-" + strconv.Itoa(brokerGroupIndex),
 	}}
+	if broker.Spec.ClusterMode == "CONTROLLER" {
+		envs = append(envs, corev1.EnvVar{Name: cons.EnvEnableControllerMode, Value: "true"})
+		envs = append(envs, corev1.EnvVar{Name: cons.EnvControllerAddr, Value: share.ControllerAccessPoint})
+	}
 	envs = append(envs, broker.Spec.Env...)
 	return envs
 }

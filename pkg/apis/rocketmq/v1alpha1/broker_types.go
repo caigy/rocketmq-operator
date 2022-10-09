@@ -31,9 +31,13 @@ type BrokerSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
+	// Size of broker clusters
 	Size int `json:"size"`
 	// NameServers defines the name service list e.g. 192.168.1.1:9876;192.168.1.2:9876
 	NameServers string `json:"nameServers,omitempty"`
+	// ClusterMode defines the way to be a broker cluster, valid values can be one of the following:
+	// STATIC(default), CONTROLLER, CONTAINER
+	ClusterMode string `json:"clusterMode,omitempty"`
 	// ReplicaPerGroup each broker cluster's replica number
 	ReplicaPerGroup int `json:"replicaPerGroup"`
 	// BaseImage is the broker image to use for the Pods
