@@ -147,4 +147,11 @@ const (
 
 	// TopicListConsumerGroup is the consumer group field index of the output when using command check topic list
 	TopicListConsumerGroup = 2
+
+	ControllerContainerName = "controller"
+
+	EnvControllerDLegerPeers = "controllerDLegerPeers"
+	EnvControllerStorePath   = "controllerStorePath"
+
+	EnvControllerDLegerGroup = "controllerDLegerGroup"
 )
