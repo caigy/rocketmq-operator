@@ -184,7 +184,7 @@ func (r *ReconcileBroker) Reconcile(ctx context.Context, request reconcile.Reque
 			reqLogger.Error(err, "Failed to get broker master StatefulSet.")
 		}
 
-		for replicaIndex := 1; broker.Spec.ClusterMode == "STATIC" && replicaIndex <= replicaPerGroup; replicaIndex++ {
+		for replicaIndex := 1; replicaIndex <= replicaPerGroup; replicaIndex++ {
 			reqLogger.Info("Check Replica Broker of cluster-" + strconv.Itoa(brokerGroupIndex) + " " + strconv.Itoa(replicaIndex) + "/" + strconv.Itoa(replicaPerGroup))
 			replicaDep := r.getBrokerStatefulSet(broker, brokerGroupIndex, replicaIndex)
 			err = r.client.Get(context.TODO(), types.NamespacedName{Name: replicaDep.Name, Namespace: replicaDep.Namespace}, found)
@@ -441,6 +441,7 @@ func (r *ReconcileBroker) getBrokerStatefulSet(broker *rocketmqv1alpha1.Broker, 
 				Spec: corev1.PodSpec{
 					ServiceAccountName: broker.Spec.ServiceAccountName,
 					HostNetwork:        broker.Spec.HostNetwork,
+					DNSPolicy:          corev1.DNSClusterFirstWithHostNet,
 					Affinity:           broker.Spec.Affinity,
 					Tolerations:        broker.Spec.Tolerations,
 					NodeSelector:       broker.Spec.NodeSelector,
