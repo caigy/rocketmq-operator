@@ -51,11 +51,6 @@ import (
 
 var log = logf.Log.WithName("dledger_controller")
 
-/**
-* USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
-* business logic.  Delete these comments after modifying this file.*
- */
-
 // SetupWithManager creates a new Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func SetupWithManager(mgr manager.Manager) error {
@@ -112,8 +107,6 @@ type ReconcileController struct {
 
 // Reconcile reads that state of the cluster for a Controller object and makes changes based on the state read
 // and what is in the Controller.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  This example creates
-// a Pod as an example
 // Note:
 // The Controller will requeue the Request to be processed again if the returned error is non-nil or
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
@@ -156,32 +149,19 @@ func (r *ReconcileController) Reconcile(ctx context.Context, request reconcile.R
 		}
 	}
 
-	// if broker.Status.Size == 0 {
-	// 	share.GroupNum = broker.Spec.Size
-	// } else {
-	// 	share.GroupNum = broker.Status.Size
-	// }
-
-	// share.BrokerClusterName = broker.Name
-	// replicaPerGroup := broker.Spec.ReplicaPerGroup
-	// reqLogger.Info("brokerGroupNum=" + strconv.Itoa(share.GroupNum) + ", replicaPerGroup=" + strconv.Itoa(replicaPerGroup))
-	// for controllerIndex := 0; controllerIndex < share.GroupNum; controllerIndex++ {
-	// 	reqLogger.Info("Check Broker cluster " + strconv.Itoa(controllerIndex+1) + "/" + strconv.Itoa(share.GroupNum))
-	dep := r.getControllerStatefulSet(controller)
+	sts := r.getControllerStatefulSet(controller)
 	// Check if the statefulSet already exists, if not create a new one
 	found := &appsv1.StatefulSet{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: dep.Name, Namespace: dep.Namespace}, found)
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: sts.Name, Namespace: sts.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating a new Controller StatefulSet.", "StatefulSet.Namespace", dep.Namespace, "StatefulSet.Name", dep.Name)
-		err = r.client.Create(context.TODO(), dep)
+		reqLogger.Info("Creating a new Controller StatefulSet.", "StatefulSet.Namespace", sts.Namespace, "StatefulSet.Name", sts.Name)
+		err = r.client.Create(context.TODO(), sts)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create new Controller StatefulSet", "StatefulSet.Namespace", dep.Namespace, "StatefulSet.Name", dep.Name)
+			reqLogger.Error(err, "Failed to create new Controller StatefulSet", "StatefulSet.Namespace", sts.Namespace, "StatefulSet.Name", sts.Name)
 		}
 	} else if err != nil {
 		reqLogger.Error(err, "Failed to list Controller StatefulSet.")
 	}
-
-	//}
 
 	// List the pods for this controller's statefulSet
 	podList := &corev1.PodList{}
@@ -227,7 +207,8 @@ func (r *ReconcileController) Reconcile(ctx context.Context, request reconcile.R
 
 	//create svc
 	controllerSvc := &corev1.Service{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: request.Name + "-svc", Namespace: request.Namespace}, controllerSvc)
+	controllerSvcName := tool.BuildSvcResourceName(request.Name)
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: controllerSvcName, Namespace: request.Namespace}, controllerSvc)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// create;
@@ -243,71 +224,14 @@ func (r *ReconcileController) Reconcile(ctx context.Context, request reconcile.R
 			return reconcile.Result{}, err
 		}
 	}
-	share.ControllerAccessPoint = request.Name + "-svc" + ":9878"
+	share.ControllerAccessPoint = controllerSvcName + ":9878"
 
 	return reconcile.Result{Requeue: true, RequeueAfter: time.Duration(cons.RequeueIntervalInSecond) * time.Second}, nil
 }
 
-// func getCopyMetadataJsonCommand(dir string, sourcePodName string, namespace string, k8s *tool.K8sClient) string {
-// 	cmdOpts := buildInputCommand(dir)
-// 	topicsJsonStr, err := exec(cmdOpts, sourcePodName, k8s, namespace)
-// 	if err != nil {
-// 		log.Error(err, "exec command failed, output is: "+topicsJsonStr)
-// 		return ""
-// 	}
-// 	topicsCommand := buildOutputCommand(topicsJsonStr, dir)
-// 	return strings.Join(topicsCommand, " ")
-// }
-
-// func buildInputCommand(source string) []string {
-// 	cmdOpts := []string{
-// 		"cat",
-// 		source,
-// 	}
-// 	return cmdOpts
-// }
-
-// func buildOutputCommand(content string, dest string) []string {
-// 	replaced := strings.Replace(content, "\"", "\\\"", -1)
-// 	cmdOpts := []string{
-// 		"echo",
-// 		"-e",
-// 		"\"" + replaced + "\"",
-// 		">",
-// 		dest,
-// 	}
-// 	return cmdOpts
-// }
-
-// func exec(cmdOpts []string, podName string, k8s *tool.K8sClient, namespace string) (string, error) {
-// 	log.Info("On pod " + podName + ", command being run: " + strings.Join(cmdOpts, " "))
-// 	container := cons.BrokerContainerName
-// 	outputBytes, stderrBytes, err := k8s.Exec(namespace, podName, container, cmdOpts, nil)
-// 	stderr := stderrBytes.String()
-// 	output := outputBytes.String()
-
-// 	if stderrBytes != nil {
-// 		log.Info("STDERR: " + stderr)
-// 	}
-// 	log.Info("output: " + output)
-
-// 	if err != nil {
-// 		log.Error(err, "Error occurred while running command: "+strings.Join(cmdOpts, " "))
-// 		return output, err
-// 	}
-
-// 	return output, nil
-// }
-
-// func getBrokerName(broker *rocketmqv1alpha1.Broker, brokerGroupIndex int) string {
-// 	return broker.Name + "-" + strconv.Itoa(brokerGroupIndex)
-// }
-
 // returns a controller StatefulSet object
 func (r *ReconcileController) getControllerStatefulSet(controller *rocketmqv1alpha1.Controller) *appsv1.StatefulSet {
 	ls := labelsForController(controller.Name)
-	// var a int32 = 1
-	// var c = &a
 
 	// After CustomResourceDefinition version upgraded from v1beta1 to v1
 	// `controller.spec.VolumeClaimTemplates.metadata` declared in yaml will not be stored by kubernetes.
@@ -390,16 +314,13 @@ func getENV(controller *rocketmqv1alpha1.Controller) []corev1.EnvVar {
 	}, {
 		Name:  cons.EnvControllerDLegerGroup,
 		Value: "ControllerGroup-" + controller.Name,
-	}, /*{
-			Name:  cons.EnvControllerDLegerSelfId,
-			Value: strings.ReplaceAll("$(MY_POD_NAME)","-","_"),
-		},*/{
-			Name:  cons.EnvControllerDLegerPeers,
-			Value: controllerDLegerPeersStr,
-		}, {
-			Name:  cons.EnvControllerStorePath,
-			Value: cons.StoreMountPath,
-		}}
+	}, {
+		Name:  cons.EnvControllerDLegerPeers,
+		Value: controllerDLegerPeersStr,
+	}, {
+		Name:  cons.EnvControllerStorePath,
+		Value: cons.StoreMountPath,
+	}}
 	envs = append(envs, controller.Spec.Env...)
 	return envs
 }
@@ -457,13 +378,6 @@ func getVolumes(controller *rocketmqv1alpha1.Controller) []corev1.Volume {
 	}
 }
 
-// func getPathSuffix(broker *rocketmqv1alpha1.Broker, brokerGroupIndex int, replicaIndex int) string {
-// 	if replicaIndex == 0 {
-// 		return "/" + broker.Name + "-" + strconv.Itoa(brokerGroupIndex) + "-master"
-// 	}
-// 	return "/" + broker.Name + "-" + strconv.Itoa(brokerGroupIndex) + "-replica-" + strconv.Itoa(replicaIndex)
-// }
-
 // labelsForController returns the labels for selecting the resources
 // belonging to the given controller CR name.
 func labelsForController(name string) map[string]string {
@@ -481,9 +395,6 @@ func getPodNames(pods []corev1.Pod) []string {
 
 func (r *ReconcileController) generateHeadlessSvc(cr *rocketmqv1alpha1.Controller) *corev1.Service {
 	controllerSvc := &corev1.Service{
-		// TypeMeta: metav1.TypeMeta{
-		// 	Kind: cr.Spec.Service.Kind,
-		// },
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   cr.Namespace,
 			Name:        tool.BuildHeadlessSvcResourceName(cr.Name),
@@ -512,12 +423,9 @@ func (r *ReconcileController) generateHeadlessSvc(cr *rocketmqv1alpha1.Controlle
 
 func (r *ReconcileController) generateSvc(cr *rocketmqv1alpha1.Controller) *corev1.Service {
 	controllerSvc := &corev1.Service{
-		// TypeMeta: metav1.TypeMeta{
-		// 	Kind: cr.Spec.Service.Kind,
-		// },
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:  cr.Namespace,
-			Name:       cr.Name + "-svc",
+			Name:       tool.BuildSvcResourceName(cr.Name),
 			Labels:     labelsForController(cr.Name),
 			Finalizers: []string{metav1.FinalizerOrphanDependents},
 		},

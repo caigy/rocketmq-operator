@@ -22,3 +22,7 @@ import "fmt"
 func BuildHeadlessSvcResourceName(name string) string {
 	return fmt.Sprintf("%s-svc-headless", name)
 }
+
+func BuildSvcResourceName(name string) string {
+	return fmt.Sprintf("%s-svc", name)
+}

@@ -596,26 +596,3 @@ func getPodNames(pods []corev1.Pod) []string {
 	}
 	return podNames
 }
-
-func contains(item string, arr []string) bool {
-	for _, value := range arr {
-		if reflect.DeepEqual(value, item) {
-			return true
-		}
-	}
-	return false
-}
-
-func checkAndCopyMetadata(newPodNames []string, dir string, sourcePodName string, namespace string, k8s *tool.K8sClient) {
-	cmdOpts := buildInputCommand(dir)
-	jsonStr, _ := exec(cmdOpts, sourcePodName, k8s, namespace) // TODO handler error
-	if len(jsonStr) < cons.MinMetadataJsonFileSize {
-		log.Info("The file " + dir + " is abnormally too short to execute metadata transmission, please check whether the source broker pod " + sourcePodName + " is correct")
-	} else {
-		// for each new pod, copy the metadata from the scale source pod
-		for _, newPodName := range newPodNames {
-			cmdOpts = buildOutputCommand(jsonStr, dir)
-			exec(cmdOpts, newPodName, k8s, namespace)
-		}
-	}
-}
